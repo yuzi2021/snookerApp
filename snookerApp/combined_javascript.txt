@@ -1,0 +1,871 @@
+
+ -------------------- balls.js ------------------------ 
+
+// Class Ball
+class Ball {
+    constructor(x, y, radius, color) {
+        // Initialize the Matter.js body
+        this.body = Bodies.circle(x, y, radius, {
+            isStatic: false,
+            restitution: 0.8,  // Adjusted for better bounce
+            friction: 0.005,   // Low friction to prevent sticking
+            frictionAir: 0.01, // Low air friction to simulate realistic movement
+            label: 'ball',     // Ensure the label is set for collision detection
+            render: {
+                fillStyle: color
+            }
+        });
+
+        this.color = color;
+        this.initialPosition = { x, y }; // Store initial position
+        World.add(engine.world, this.body);
+        Body.setVelocity(this.body, { x: 0, y: 0 }); // Ensure balls start with zero velocity
+    }
+
+    // Method to draw the ball on the canvas
+    draw() {
+        push();
+        fill(this.color);
+        drawVertices(this.body.vertices);
+        pop();
+    }
+
+    // Method to check if the ball has been potted
+    isPotted() {
+        let x = this.body.position.x;
+        let y = this.body.position.y;
+
+        // Define pocket centers
+        let pockets = [
+            { x: pocketRadius * 1.5, y: pocketRadius * 1.5 }, // top-left
+            { x: tableWidth - pocketRadius * 1.5, y: pocketRadius * 1.5 }, // top-right
+            { x: pocketRadius, y: tableHeight - pocketRadius * 1.5 }, // bottom-left
+            { x: tableWidth - pocketRadius, y: tableHeight - pocketRadius * 1.5 }, // bottom-right
+            { x: tableWidth / 2, y: pocketRadius }, // top-middle
+            { x: tableWidth / 2, y: tableHeight - pocketRadius } // bottom-middle
+        ];
+
+        // Check if the ball is within any pocket
+        for (let pocket of pockets) {
+            let distance = dist(x, y, pocket.x, pocket.y);
+            if (distance <= pocketRadius) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Method to check if the ball is out of bounds
+    isOutOfBounds() {
+        let x = this.body.position.x;
+        let y = this.body.position.y;
+        return x < ballRadius || x > tableWidth - ballRadius || y < ballRadius || y > tableHeight - ballRadius;
+    }
+
+    // Method to reset the ball to its initial position
+    resetPosition(x, y) {
+        Body.setPosition(this.body, { x: x, y: y });
+        Body.setVelocity(this.body, { x: 0, y: 0 });
+    }
+
+    resetToInitialPosition() {
+        this.resetPosition(this.initialPosition.x, this.initialPosition.y);
+    }
+
+    // Method to check if the ball has moved from its initial position
+    hasMoved() {
+        let x = this.body.position.x;
+        let y = this.body.position.y;
+        return dist(x, y, this.initialPosition.x, this.initialPosition.y) > 0.1;
+    }
+}
+
+// Variables
+let balls = [];
+let redBalls = [];
+let cueBall;
+let initialColoredBallPositions = [];
+
+// Function to set up all balls
+function setupBalls() {
+    // Clear the previous balls
+    balls = [];
+    redBalls = [];
+    World.clear(engine.world, false);
+
+    pinkBallFactor = 22 / 8.5;
+    pinkBallPositionX = tableWidth - pinkBallFactor * dRadius * 1.5; // adjusted for better visuals
+
+    // Initialize positions for colored balls
+    let yellowPos = { x: baulkLineX, y: tableHeight / 2 + dRadius };
+    let greenPos = { x: baulkLineX, y: tableHeight / 2 - dRadius };
+    let brownPos = { x: baulkLineX, y: tableHeight / 2 };
+    let bluePos = { x: tableWidth / 2, y: tableHeight / 2 };
+    let pinkPos = { x: pinkBallPositionX, y: tableHeight / 2 };
+    let blackPos = { x: tableWidth - dRadius, y: tableHeight / 2 };
+
+    // Create Ball objects for each colored ball
+    let yellowBall = new Ball(yellowPos.x, yellowPos.y, ballRadius, 'yellow');
+    let greenBall = new Ball(greenPos.x, greenPos.y, ballRadius, 'lightgreen');
+    let brownBall = new Ball(brownPos.x, brownPos.y, ballRadius, 'brown');
+    let blueBall = new Ball(bluePos.x, bluePos.y, ballRadius, 'blue');
+    let pinkBall = new Ball(pinkPos.x, pinkPos.y, ballRadius, 'pink');
+    let blackBall = new Ball(blackPos.x, blackPos.y, ballRadius, 'black');
+
+    // Store initial positions of colored balls
+    initialColoredBallPositions = [
+        { ball: yellowBall, pos: yellowPos },
+        { ball: greenBall, pos: greenPos },
+        { ball: brownBall, pos: brownPos },
+        { ball: blueBall, pos: bluePos },
+        { ball: pinkBall, pos: pinkPos },
+        { ball: blackBall, pos: blackPos }
+    ];
+
+    // Add colored balls to the balls array
+    balls.push(yellowBall, greenBall, brownBall, blueBall, pinkBall, blackBall);
+
+    if (mode === 1 || mode === 2 || mode === 3) {
+        // Position the red balls in a tightly packed triangle formation
+        let startX = pinkPos.x + 2 * ballRadius + 1; // Adjust starting X position
+        let startY = pinkPos.y; // Starting Y position is the same as the pink ball
+        let gap = ballRadius * 2;
+        for (let row = 0; row < 5; row++) {
+            for (let col = 0; col <= row; col++) {
+                let x = startX + row * ballRadius * 1.7;
+                let y = startY - row * gap / 2 + col * gap;
+                let redBall = new Ball(x, y, ballRadius, 'red');
+                redBalls.push(redBall);
+                balls.push(redBall);
+            }
+        }
+    }
+
+    if (mode === 2 || mode === 3) {
+        // Position red balls randomly in mode 2 and all balls randomly in mode 3
+        if (mode === 2) {
+            redBalls.forEach(ball => {
+                let x = random(pocketDiameter + cushionThickness, tableWidth - pocketDiameter - cushionThickness);
+                let y = random(pocketDiameter + cushionThickness, tableHeight - pocketDiameter - cushionThickness);
+                ball.resetPosition(x, y);
+            });
+        } else if (mode === 3) {
+            balls.forEach(ball => {
+                let x = random(pocketDiameter + cushionThickness, tableWidth - pocketDiameter - cushionThickness);
+                let y = random(pocketDiameter + cushionThickness, tableHeight - pocketDiameter - cushionThickness);
+                ball.resetPosition(x, y);
+            });
+        }
+    }
+
+    // Clear collision messages when switching modes
+    collisionMessages = [];
+
+    // Create and initialize the cue ball in a random position within the "D" zone
+    let randomAngle = random(PI / 2, 3 / 2 * PI); // Angle within the "D" zone
+    let randomRadius = random(0, dRadius - ballRadius); // Radius within the "D" zone
+    let cueBallX = dCenterX + randomRadius * cos(randomAngle);
+    let cueBallY = tableHeight / 2 + randomRadius * sin(randomAngle);
+    cueBall = new Ball(cueBallX, cueBallY, ballRadius, 'white');
+
+    // Set labels for collision detection
+    yellowBall.body.label = 'ball';
+    greenBall.body.label = 'ball';
+    brownBall.body.label = 'ball';
+    blueBall.body.label = 'ball';
+    pinkBall.body.label = 'ball';
+    blackBall.body.label = 'ball';
+    redBalls.forEach(ball => ball.body.label = 'ball');
+    cueBall.body.label = 'cueBall';
+}
+
+function drawBalls() {
+    cueBall.draw();
+    for (let ball of balls) {
+        ball.draw();
+    }
+}
+
+function handleBallInteractions() {
+    let allRedBallsPotted = redBalls.every(ball => ball.isPotted());
+
+    // Logic to detect collisions and handle pocketing
+    for (let ball of balls) {
+        if (ball.isPotted()) {
+            if (ball.color === 'red') {
+                removePottedBall(ball);
+                lastPottedBallColor = 'red'; // Update the last potted ball's color
+            } else {
+                if (allRedBallsPotted) {
+                    // Allow colored balls to be potted and removed from the table
+                    removePottedBall(ball);
+                } else {
+                    // Check if two consecutive colored balls are potted
+                    if (lastPottedBallColor !== 'red' && lastPottedBallColor !== null) {
+                        foulOccurred = true;
+                        showFoulMessage = true;
+                        clearTimeout(foulMessageTimeout);
+                        foulMessageTimeout = setTimeout(() => {
+                            showFoulMessage = false;
+                        }, 3000); // Hide message after 3 seconds
+                    } else {
+                        foulOccurred = false;
+                    }
+                    lastPottedBallColor = ball.color; // Update the last potted ball's color
+                    if (!allRedBallsPotted) {
+                        ball.resetToInitialPosition();
+                    }
+                }
+            }
+        } else if (ball.isOutOfBounds()) {
+            ball.resetToInitialPosition();
+        }
+    }
+    if (cueBall.isPotted() || cueBall.isOutOfBounds()) {
+        placingCueBall = true; // Set flag for placing the cue ball
+        cueStick.makeInvisible(); // Hide the cue stick
+        cueBall.resetPosition(dCenterX, tableHeight / 2); // Place the cue ball in the D zone
+    }
+
+    // Check if any colored ball has moved from its initial position and reset it
+    if ((mode === 1 || mode === 2) && !firstShotTaken) {
+        initialColoredBallPositions.forEach(({ ball, pos }) => {
+            if (ball.hasMoved()) {
+                ball.resetToInitialPosition();
+            }
+        });
+    }
+}
+
+
+// Utility function to remove a potted ball
+function removePottedBall(ball) {
+    World.remove(engine.world, ball.body);
+    balls = balls.filter(b => b !== ball);
+    redBalls = redBalls.filter(b => b !== ball);
+}
+
+function resetCueBall() {
+    let randomAngle = random(PI / 2, 3 / 2 * PI);
+    let randomRadius = random(0, dRadius - ballRadius);
+    let cueBallX = dCenterX + randomRadius * cos(randomAngle);
+    let cueBallY = tableHeight / 2 + randomRadius * sin(randomAngle);
+    cueBall.resetPosition(cueBallX, cueBallY);
+}
+
+ -------------------- cue.js ------------------------ 
+
+class CueStick {
+    constructor() {
+        this.angle = 0;
+        this.power = 0;
+        this.length = 150; // Fixed length of the cue stick
+        this.offset = 25; // Distance between the cue stick and the ball
+        this.visible = false; // Visibility of the cue stick
+        this.dragging = false; // To track if the cue stick is being dragged
+        this.dragStart = null; // Initial drag position
+    }
+
+    draw() {
+        if (this.visible) {
+            push();
+            stroke(255);
+            strokeWeight(4); // Make the cue stick line thicker for better visibility
+            translate(cueBall.body.position.x + 150, cueBall.body.position.y + 150);
+            rotate(this.angle);
+            line(-this.offset - this.power, 0, -this.offset - this.length - this.power, 0); // Adjust stick position based on power
+            pop();
+        }
+    }
+
+    aim(x, y) {
+        this.angle = atan2(cueBall.body.position.y - y, cueBall.body.position.x - x);
+    }
+
+    adjustAngle(delta) {
+        this.angle += delta;
+    }
+
+    shoot() {
+        let forceMagnitude = this.power * 0.001; // Adjust force magnitude for realism
+        let force = p5.Vector.fromAngle(this.angle).mult(forceMagnitude);
+        Body.applyForce(cueBall.body, cueBall.body.position, { x: force.x, y: force.y });
+        this.power = 0; // Reset power after shooting
+        this.visible = false; // Retract cue stick after shooting
+
+        // Mark the first shot as taken
+        if (!firstShotTaken) {
+            firstShotTaken = true;
+        }
+    }
+
+    updatePower(x, y) {
+        if (this.dragging) {
+            // Calculate power based on the distance from the initial drag position
+            let maxDragDistance = 200; // Define the maximum drag distance for full power
+            let dragDistance = dist(x, y, this.dragStart.x, this.dragStart.y);
+            dragDistance = constrain(dragDistance, 0, maxDragDistance); // Ensure drag distance does not exceed maxDragDistance
+            this.power = map(dragDistance, 0, maxDragDistance, 0, 200); // Map drag distance to power
+            if (this.power < 0) this.power = 0; // Ensure power does not go negative
+        }
+    }
+
+    updatePosition(x, y) {
+        this.aim(x, y); // Update angle based on mouse position
+        this.updatePower(x, y); // Update power based on mouse position
+    }
+
+    makeVisible() {
+        this.visible = true;
+        this.dragging = false; // Reset dragging when the cue stick becomes visible
+        this.dragStart = null; // Reset drag start position
+    }
+
+    makeInvisible() {
+        this.visible = false;
+        this.dragging = false; // Reset dragging when the cue stick becomes invisible
+        this.dragStart = null; // Reset drag start position
+    }
+
+    increasePower() {
+        this.power = min(this.power + 5, 100); // Increment power by 5, max 100
+    }
+
+    decreasePower() {
+        this.power = max(this.power - 5, 0); // Decrement power by 5, min 0
+    }
+
+    handleKeyInput(keyCode) {
+        if (!placingCueBall) {
+            if (keyCode === LEFT_ARROW) {
+                this.adjustAngle(-0.05); // Fine-tune angle to the left
+            } else if (keyCode === RIGHT_ARROW) {
+                this.adjustAngle(0.05); // Fine-tune angle to the right
+            } else if (keyCode === UP_ARROW) {
+                this.increasePower(); // Increase power
+            } else if (keyCode === DOWN_ARROW) {
+                this.decreasePower(); // Decrease power
+            }
+        }
+    }
+}
+
+function mouseMoved() {
+    if (cueStick && !placingCueBall && cueStick.visible && !cueStick.dragging) {
+        cueStick.aim(mouseX - 150, mouseY - 150);
+    }
+}
+
+function mousePressed() {
+    if (placingCueBall) {
+        if (isCueBallInDZone(mouseX - 150, mouseY - 150)) { // Ensure within "D" zone
+            cueBall.resetPosition(mouseX - 150, mouseY - 150);
+        }
+    } else {
+        // Check if the cue ball is clicked to show the cue stick
+        let d = dist(mouseX - 150, mouseY - 150, cueBall.body.position.x, cueBall.body.position.y);
+        if (d < ballRadius) {
+            cueStick.makeVisible();
+        }
+
+        if (cueStick.visible) {
+            // Initial aim when mouse is pressed
+            cueStick.aim(mouseX - 150, mouseY - 150);
+            cueStick.dragStart = { x: mouseX - 150, y: mouseY - 150 }; // Set initial drag position
+        }
+    }
+}
+
+function mouseDragged() {
+    if (placingCueBall) {
+        let dx = mouseX - dCenterX - 150;
+        let dy = mouseY - tableHeight / 2 - 150;
+        if (isCueBallInDZone(mouseX - 150, mouseY - 150)) { // Ensure within "D" zone
+            cueBall.resetPosition(mouseX - 150, mouseY - 150);
+        }
+    } else if (cueStick.visible) {
+        cueStick.dragging = true; // Start dragging when the mouse is dragged
+        // Update power and aim as mouse is dragged
+        cueStick.updatePosition(mouseX - 150, mouseY - 150);
+    }
+}
+
+function mouseReleased() {
+    if (placingCueBall) {
+        if (isCueBallInDZone(cueBall.body.position.x, cueBall.body.position.y)) {
+            placingCueBall = false;
+            cueStick.makeVisible();
+        }
+    } else if (cueStick.visible && cueStick.dragging) {
+        cueStick.shoot();
+        cueStick.dragging = false; // Reset dragging when the shot is made
+        cueStick.dragStart = null; // Reset drag start position
+    }
+}
+
+ -------------------- sketch.js ------------------------ 
+
+let canvas;
+let tableWidth = 1000; // 12 ft scaled down to 1000 pixels
+let tableHeight = tableWidth / 2; // 6 ft scaled down to 500 pixels
+let ballDiameter = tableWidth / 36; // Ball diameter
+let ballRadius = ballDiameter / 2; // Ball radius
+let pocketDiameter = ballDiameter * 1.5; // Pocket diameter
+let pocketRadius = pocketDiameter / 2; // Pocket radius
+let dRadius = tableWidth / 12; // Reduced Radius to 1/12 of the table width for better visuals
+let dCenterX = tableWidth / 5;
+let cushionThickness = pocketRadius * 3 / 4; // Thickness of the cushions
+let cushionLength = tableWidth / 2 - 3.5 * pocketRadius;
+let baulkLineX = dCenterX;
+
+let Engine = Matter.Engine;
+let Render = Matter.Render;
+let World = Matter.World;
+let Bodies = Matter.Bodies;
+let Body = Matter.Body;
+
+let engine;
+let cueStick;
+let cushion1, cushion2, cushion3, cushion4, cushion5, cushion6;
+
+let staticLayer;
+let collisionMessages = []; // Store collision messages
+let showCollisionMessages = false;
+
+let mode = 1; // Default mode
+let placingCueBall = false; // Flag for placing cue ball
+
+// Track the last potted ball's color
+let lastPottedBallColor = null;
+let foulOccurred = false;
+let showFoulMessage = false;
+let foulMessageTimeout;
+
+let firstShotTaken = false;
+
+
+function setup() {
+    canvas = createCanvas(tableWidth + 300, tableHeight + 300);
+    engine = Engine.create();
+    engine.world.gravity.y = 0; // Disable gravity for a top-down view
+    setupBalls();
+    setupCushions();
+
+    cueStick = new CueStick();
+
+    Matter.Runner.run(engine); // Start the physics engine
+
+    setupCollisionDetection(); // Set up collision detection only once
+    drawStaticElements();
+    
+    // Start the game in cue ball placement mode
+    placingCueBall = true;
+}
+
+function draw() {
+    background(60, 82, 45); // the floor colour
+    image(staticLayer, 150, 150); // Draw static elements centered
+    drawCushions(); // Draw cushions directly on the main canvas
+    drawBalls();
+    cueStick.draw();
+    handleBallInteractions(); // Check for collisions and handle pocketing
+    Engine.update(engine);
+
+    if (!cueStick.visible && allBallsStopped() && !placingCueBall) {
+        cueStick.makeVisible(); // Make cue stick visible after all balls have stopped
+    }
+
+    if (!cueStick.visible) {
+        showCollisionMessages = true; // Show collision messages after the shot
+    }
+
+    if (showCollisionMessages) {
+        displayCollisionMessages(); // Display collision messages on the screen
+    }
+
+    if (placingCueBall) {
+        displayCueBallPlacementMessage(); // Display message when placing cue ball
+    }
+
+    if (showFoulMessage) {
+        displayFoulPlayMessage(); // Display foul play message
+    }
+
+    if (allBallsStopped() && showCollisionMessages) {
+        collisionMessages = []; // Clear collision messages once all balls have stopped moving
+        showCollisionMessages = false; // Reset the flag to hide messages
+    }
+
+    displayInstructions();
+    displayAppName();
+}
+
+function drawStaticElements() {
+    staticLayer = createGraphics(tableWidth, tableHeight);
+    drawPerlinNoiseTableColor(staticLayer); // Draw Perlin noise background
+    drawTable(staticLayer);
+}
+
+function drawPerlinNoiseTableColor(graphics) {
+    graphics.loadPixels();
+    let noiseScale = 20;
+    for (let x = 0; x < graphics.width; x++) {
+        for (let y = 0; y < graphics.height; y++) {
+            let noiseVal = noise(x * noiseScale, y * noiseScale);
+            let colorVal = map(noiseVal, 0, 1, 100, 150); // Green color range for felt texture
+            graphics.set(x, y, color(0, colorVal, 0));
+        }
+    }
+    graphics.updatePixels();
+}
+
+function drawTable(graphics) {
+    // Draw the "D" zone and baulk line
+    drawDZone(graphics);
+    // Draw rails
+    drawRails(graphics);
+    // Draw pockets
+    graphics.fill(0);
+    drawPockets(graphics);
+}
+
+function drawDZone(graphics) {
+    graphics.noFill();
+    graphics.stroke(255);
+    // Draw the baulk line (vertical line)
+    graphics.line(baulkLineX, 0, baulkLineX, tableHeight);
+    // Draw the "D" zone arc
+    graphics.arc(dCenterX, tableHeight / 2, dRadius * 2, dRadius * 2, PI / 2, 3 * PI / 2);
+    // Label "D" zone
+    graphics.textSize(12);
+    graphics.fill(255);
+    graphics.noStroke();
+    graphics.text("the \"D\" zone", dCenterX - 70, tableHeight / 2);
+}
+
+function drawRails(graphics) {
+    // Draw long side rails
+    graphics.fill(139, 69, 19);
+    graphics.rect(0, 0, tableWidth, pocketRadius);
+    graphics.rect(0, tableHeight - pocketRadius, tableWidth, pocketRadius);
+    // Draw short side rails
+    graphics.rect(0, 0, pocketRadius, tableHeight);
+    graphics.rect(tableWidth - pocketRadius, 0, pocketRadius, tableHeight);
+}
+
+function drawPockets(graphics) {
+    // Corner pockets
+    graphics.ellipse(pocketRadius * 1.5, pocketRadius * 1.5, pocketRadius * 2, pocketRadius * 2);
+    graphics.ellipse(tableWidth - pocketRadius * 1.5, pocketRadius * 1.5, pocketRadius * 2, pocketRadius * 2);
+    graphics.ellipse(pocketRadius * 1.5, tableHeight - pocketRadius * 1.5, pocketRadius * 2, pocketRadius * 2);
+    graphics.ellipse(tableWidth - pocketRadius * 1.5, tableHeight - pocketRadius * 1.5, pocketRadius * 2, pocketRadius * 2);
+    // Middle pockets
+    graphics.ellipse(tableWidth / 2, pocketRadius, pocketRadius * 2, pocketRadius * 2);
+    graphics.ellipse(tableWidth / 2, tableHeight - pocketRadius, pocketRadius * 2, pocketRadius * 2);
+}
+
+function setupCushions() {
+    // Define trapezoidal cushions using Matter.Bodies from vertices
+    cushion1 = Bodies.fromVertices(
+        tableWidth * 1 / 4 + pocketRadius / 1.5, pocketRadius + cushionThickness / 2,
+        [
+            { x: -cushionLength / 2, y: -cushionThickness / 2 },
+            { x: cushionLength / 2, y: -cushionThickness / 2 },
+            { x: cushionLength / 2 - pocketRadius, y: cushionThickness / 2 },
+            { x: -cushionLength / 2 + pocketRadius, y: cushionThickness / 2 }
+        ],
+        { isStatic: true, restitution: 1, label: 'cushion' }
+    );
+    cushion2 = Bodies.fromVertices(
+        tableWidth * 3 / 4 - pocketRadius / 1.5, pocketRadius + cushionThickness / 2,
+        [
+            { x: -cushionLength / 2, y: -cushionThickness / 2 },
+            { x: cushionLength / 2, y: -cushionThickness / 2 },
+            { x: cushionLength / 2 - pocketRadius, y: cushionThickness / 2 },
+            { x: -cushionLength / 2 + pocketRadius, y: cushionThickness / 2 }
+        ],
+        { isStatic: true, restitution: 1, label: 'cushion' }
+    );
+    cushion3 = Bodies.fromVertices(
+        tableWidth * 1 / 4 + pocketRadius / 1.5, tableHeight - (pocketRadius + cushionThickness / 2),
+        [
+            { x: -cushionLength / 2 + pocketRadius, y: -cushionThickness / 2 },
+            { x: cushionLength / 2 - pocketRadius, y: -cushionThickness / 2 },
+            { x: cushionLength / 2, y: cushionThickness / 2 },
+            { x: -cushionLength / 2, y: cushionThickness / 2 }
+        ],
+        { isStatic: true, restitution: 1, label: 'cushion' }
+    );
+    cushion4 = Bodies.fromVertices(
+        tableWidth * 3 / 4 - pocketRadius / 1.5, tableHeight - (pocketRadius + cushionThickness / 2),
+        [
+            { x: -cushionLength / 2 + pocketRadius, y: -cushionThickness / 2 },
+            { x: cushionLength / 2 - pocketRadius, y: -cushionThickness / 2 },
+            { x: cushionLength / 2, y: cushionThickness / 2 },
+            { x: -cushionLength / 2, y: cushionThickness / 2 }
+        ],
+        { isStatic: true, restitution: 1, label: 'cushion' }
+    );
+
+    // Short side cushions
+
+    var shortsidecushionlength = tableHeight - pocketDiameter * 2 - pocketRadius
+    cushion5 = Bodies.fromVertices(
+        pocketRadius + cushionThickness / 2, tableHeight / 2,
+        [
+            { x: -cushionThickness / 2, y: -shortsidecushionlength / 2 },
+            { x: cushionThickness / 2, y: -shortsidecushionlength / 2 + pocketRadius },
+            { x: cushionThickness / 2, y: shortsidecushionlength / 2 - pocketRadius },
+            { x: -cushionThickness / 2, y: shortsidecushionlength / 2 }
+        ],
+        { isStatic: true, restitution: 1, label: 'cushion' }
+    );
+    cushion6 = Bodies.fromVertices(
+        tableWidth - (pocketRadius + cushionThickness / 2), tableHeight / 2,
+        [
+            { x: -cushionThickness / 2, y: -shortsidecushionlength / 2 + pocketRadius },
+            { x: cushionThickness / 2, y: -shortsidecushionlength / 2 },
+            { x: cushionThickness / 2, y: shortsidecushionlength / 2 },
+            { x: -cushionThickness / 2, y: shortsidecushionlength / 2 - pocketRadius }
+        ],
+        { isStatic: true, restitution: 1, label: 'cushion' }
+    );
+
+    World.add(engine.world, [cushion1, cushion2, cushion3, cushion4, cushion5, cushion6]);
+}
+
+function drawCushions() {
+    push();
+    fill(139, 69, 19, 90); // Cushion color
+    drawVertices(cushion1.vertices);
+    drawVertices(cushion2.vertices);
+    drawVertices(cushion3.vertices);
+    drawVertices(cushion4.vertices);
+    drawVertices(cushion5.vertices);
+    drawVertices(cushion6.vertices);
+    pop();
+}
+
+function drawVertices(vertices) {
+    beginShape();
+    for (let i = 0; i < vertices.length; i++) {
+        vertex(vertices[i].x + 150, vertices[i].y + 150);
+    }
+    endShape(CLOSE);
+}
+
+function displayInstructions() {
+    push();
+    fill(255);
+    textSize(18);
+    let x = 150; // Adjusted x position to center the text
+    let y = tableHeight + 180; // Position below the table
+    text("Instructions:", x, y);
+    y += 20;
+    text("1. Mouse to aim/shoot, drag to adjust power.", x, y);
+    y += 20;
+    text("2. Arrow keys: Left/Right to adjust angle, Up/Down to adjust power.", x, y);
+    y += 20;
+    text("3. Press 'P' to place cue ball.", x, y);
+    y += 20;
+    text("4. Modes: 1 - Standard, 2 - Random Reds, 3 - All Random.", x, y);
+    pop();
+}
+
+function displayAppName() {
+    push();
+    translate(width - 75, height / 2); // Adjust the position to the right margin
+    rotate(HALF_PI); // Rotate to make the text vertical from bottom to top
+    fill(255);
+    textSize(32);
+    textAlign(CENTER, CENTER);
+    text("Snooker Practice", 0, 0);
+    pop();
+}
+
+function displayCollisionMessages() {
+    fill(255);
+    textSize(16);
+    let y = 20;
+    for (let i = 0; i < collisionMessages.length; i++) {
+        text(`${i + 1}. ${collisionMessages[i]}`, 10, y);
+        y += 20;
+    }
+}
+
+function displayCueBallPlacementMessage() {
+    push();
+    stroke(255, 0, 0);
+    strokeWeight(4);
+    textSize(25);
+    textAlign(CENTER, CENTER);
+    text("Place the cue ball in the 'D' zone", 150 + tableWidth / 2, 75);
+    pop();
+}
+
+function displayFoulPlayMessage() {
+    push();
+    stroke(255, 0, 0);
+    strokeWeight(4);
+    textSize(25);
+    textAlign(CENTER, CENTER);
+    text("Foul Two Coloured Balls Potted in a Row", 150 + tableWidth / 2, 150);
+    pop();
+}
+
+// Handle key presses to switch between modes
+function keyPressed() {
+    if (key === '1') {
+        mode = 1;
+        setupBalls();
+        setupCushions();
+    } else if (key === '2') {
+        mode = 2;
+        setupBalls();
+        setupCushions();
+    } else if (key === '3') {
+        mode = 3;
+        setupBalls();
+        setupCushions();
+    } else if (key === 'P' || key === 'p') {
+        placingCueBall = !placingCueBall;
+        if (placingCueBall) {
+            cueStick.makeInvisible(); // Hide cue stick when placing the cue ball
+        } else {
+            cueStick.makeVisible(); // Show cue stick after placing the cue ball
+        }
+    } else {
+        cueStick.handleKeyInput(keyCode); // Forward key input to cueStick
+    }
+}
+
+function mouseMoved() {
+    if (!placingCueBall && cueStick.visible && !cueStick.dragging) {
+        cueStick.aim(mouseX - 150, mouseY - 150);
+    }
+}
+
+function mousePressed() {
+    if (placingCueBall) {
+        let dx = mouseX - dCenterX - 150;
+        let dy = mouseY - tableHeight / 2 - 150;
+        if (isCueBallInDZone(mouseX - 150, mouseY - 150)) { // Ensure within "D" zone
+            cueBall.resetPosition(mouseX - 150, mouseY - 150);
+        }
+    } else {
+        // Check if the cue ball is clicked to show the cue stick
+        let d = dist(mouseX - 150, mouseY - 150, cueBall.body.position.x, cueBall.body.position.y);
+        if (d < ballRadius) {
+            cueStick.makeVisible();
+        }
+
+        if (cueStick.visible) {
+            // Initial aim when mouse is pressed
+            cueStick.aim(mouseX - 150, mouseY - 150);
+        }
+    }
+}
+
+function mouseDragged() {
+    if (placingCueBall) {
+        let dx = mouseX - dCenterX - 150;
+        let dy = mouseY - tableHeight / 2 - 150;
+        if (isCueBallInDZone(mouseX - 150, mouseY - 150)) { // Ensure within "D" zone
+            cueBall.resetPosition(mouseX - 150, mouseY - 150);
+        }
+    } else if (cueStick.visible) {
+        cueStick.dragging = true; // Start dragging when the mouse is dragged
+        // Update power and aim as mouse is dragged
+        cueStick.updatePosition(mouseX - 150, mouseY - 150);
+    }
+}
+
+function mouseReleased() {
+    if (placingCueBall) {
+        if (isCueBallInDZone(cueBall.body.position.x, cueBall.body.position.y)) {
+            placingCueBall = false;
+            cueStick.makeVisible();
+        }
+    } else if (cueStick.visible && cueStick.dragging) {
+        cueStick.shoot();
+        cueStick.dragging = false; // Reset dragging when the shot is made
+    }
+}
+
+function isCueBallInDZone(x, y) {
+    let dx = x - dCenterX;
+    let dy = y - tableHeight / 2;
+    return dx * dx + dy * dy <= dRadius * dRadius;
+}
+
+function allBallsStopped() {
+    // Check if all balls have stopped moving
+    for (let ball of balls) {
+        let speed = sqrt(ball.body.velocity.x ** 2 + ball.body.velocity.y ** 2);
+        if (speed > 0.01) {
+            return false;
+        }
+    }
+    let cueBallSpeed = sqrt(cueBall.body.velocity.x ** 2 + cueBall.body.velocity.y ** 2);
+    if (cueBallSpeed > 0.01) {
+        return false;
+    }
+    return true;
+}
+
+// Collision Detection: This handles interactions between the cue ball and other objects
+function setupCollisionDetection() {
+    Matter.Events.on(engine, 'collisionStart', function(event) {
+        let pairs = event.pairs;
+        pairs.forEach(pair => {
+            let { bodyA, bodyB } = pair;
+
+            if (bodyA.label === 'cueBall' || bodyB.label === 'cueBall') {
+                let cueBallBody = bodyA.label === 'cueBall' ? bodyA : bodyB;
+                let otherBody = bodyA.label === 'cueBall' ? bodyB : bodyA;
+                handleCueBallCollision(cueBallBody, otherBody);
+            } else if (bodyA.label === 'ball' && bodyB.label === 'ball') {
+                handleBallCollision(bodyA, bodyB);
+            }
+        });
+    });
+}
+
+// Function to handle the collision of the cue ball with other bodies
+function handleCueBallCollision(cueBallBody, otherBody) {
+    if (otherBody.label === 'cushion') {
+        collisionMessages.push('Cue ball hit the cushion');
+    } else if (otherBody.label === 'ball') {
+        let ballColor = otherBody.render.fillStyle;
+        if (ballColor === 'red') {
+            collisionMessages.push('Cue ball hit a red ball');
+        } else {
+            collisionMessages.push(`Cue ball hit a ${ballColor} ball`);
+        }
+        handleBallCollision(cueBallBody, otherBody);
+    }
+}
+
+// Function to handle the collision between two balls
+function handleBallCollision(bodyA, bodyB) {
+    let dist = Matter.Vector.sub(bodyB.position, bodyA.position);
+    let nDist = Matter.Vector.magnitude(dist);
+    let overlap = bodyA.circleRadius + bodyB.circleRadius - nDist;
+
+    if (overlap > 0) {
+        let correction = Matter.Vector.mult(Matter.Vector.normalise(dist), overlap / 2);
+        Matter.Body.translate(bodyA, Matter.Vector.neg(correction));
+        Matter.Body.translate(bodyB, correction);
+
+        let normal = Matter.Vector.normalise(dist);
+        let relativeVelocity = Matter.Vector.sub(bodyA.velocity, bodyB.velocity);
+        let speed = Matter.Vector.dot(relativeVelocity, normal);
+
+        if (speed < 0) return;
+
+        let impulse = Matter.Vector.mult(normal, (2 * speed) / (bodyA.mass + bodyB.mass));
+        Matter.Body.setVelocity(bodyA, Matter.Vector.sub(bodyA.velocity, Matter.Vector.mult(impulse, bodyB.mass)));
+        Matter.Body.setVelocity(bodyB, Matter.Vector.add(bodyB.velocity, Matter.Vector.mult(impulse, bodyA.mass)));
+    }
+}
