@@ -37,7 +37,7 @@ This project simulates a virtual snooker table for practicing shots in three dif
 ## Demos
 
 ### Gameplay Demo:
-![the 3 modes as discussed in step 3 using 1,2,3 keystrokes](./assets/scenario1.gif
+![the 3 modes as discussed in step 3 using 1,2,3 keystrokes](./assets/scenario1.gif)
 ![if cue ball is potted is then returned to user](./assets/scenario2.gif)
 ![if a coloured ball is potted it should be returned to its designated spot](./assets/scenario3.gif)
 ![error prompts when two coloured balls are potted](./assets/scenario4.gif)
