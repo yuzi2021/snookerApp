@@ -6,6 +6,10 @@
 
 This project simulates a virtual snooker table for practicing shots in three different modes. The purpose is to provide a realistic and interactive experience for users to improve their snooker skills by experimenting with different ball configurations and collision physics. Users can switch between Standard Mode, Random Red Ball Positioning, and Fully Random Positioning, allowing them to practice different scenarios and strategies.
 
+## Live Demo
+
+You can play the Snooker Practice App [here](https://yuzi2021.github.io/snookerApp/snookerApp).
+
 ## Tech Stack
 
 - **JavaScript:** Main programming language used for the application's logic and interactivity.
